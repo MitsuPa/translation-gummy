@@ -1,4 +1,6 @@
-from flask import Flask, redirect, request
+from calendar import timegm
+import datetime
+from flask import Flask, request, g
 from dotenv import load_dotenv
 from sqlalchemy import func
 from model import db, Task, Url, KaggleUser
@@ -31,7 +33,8 @@ def transcribe():
         urls = [Url(task_id=task.id, url=url) for url in video_url]
         db.session.add_all(urls)
     try:
-        request_transcribe(task, video_url)
+        with db.session.begin():
+            request_transcribe(task, video_url)
     except Exception as e:
         app.log_exception(e)
     return {"task_id": task_id, "status": task.status}
@@ -46,34 +49,70 @@ def before_request():
     if not jwt:
         return {"error": "Authorization header is missing"}, 401
     try:
-        jwt_manager.decode(jwt)
+        payload = jwt_manager.decode(jwt, options={"verify_exp": False})
+        with db.session.begin():
+            g.task = db.session.query(Task).filter_by(uuid=payload["task_id"]).first()
+        if timegm(datetime.datetime.now(tz=datetime.timezone.utc).utctimetuple()) > int(
+            payload["exp"]
+        ):
+            raise Exception("Token has expired")
     except Exception as e:
         return {"error": str(e)}, 401
 
 
 def request_transcribe(task: Task, video_url: list[str]):
-    with db.session.begin():
-        kaggle_user = (
-            db.session.query(KaggleUser)
-            .filter_by(available=True)
-            .order_by(KaggleUser.updated_at.asc())
-            .with_for_update()
-            .limit(1)
-            .first()
+    kaggle_user = (
+        db.session.query(KaggleUser)
+        .filter_by(available=True)
+        .order_by(KaggleUser.updated_at.asc())
+        .with_for_update()
+        .limit(1)
+        .first()
+    )
+    if kaggle_user:
+        run_kaggle_kernel(
+            video_url,
+            kaggle_username=kaggle_user.username,
+            kaggle_key=KAGGLE_KEYS[kaggle_user.username],
+            max_files=os.environ.get("MAX_FILES", 1),
+            callback_jwt=jwt_manager.encode({"task_id": task.uuid}),
+            callback_url=os.environ["API_BASE_URL"] + "transcribe/callback",
         )
-        if kaggle_user:
-            run_kaggle_kernel(
-                video_url,
-                kaggle_username=kaggle_user.username,
-                kaggle_key=KAGGLE_KEYS[kaggle_user.username],
-                max_files=os.environ.get("MAX_FILES", 1),
-                callback_jwt=jwt_manager.encode({"task_id": task.uuid}),
-                callback_url=os.environ["API_BASE_URL"] + "transcribe/callback",
-            )
-            kaggle_user.available = False
-            kaggle_user.updated_at = func.now()
-            task.kaggle_user_id = kaggle_user.id
-            task.status = "running"
+        kaggle_user.available = False
+        kaggle_user.updated_at = func.now()
+        task.kaggle_user_id = kaggle_user.id
+        task.status = "running"
+
+
+def get_top_pending_task():
+    task = (
+        db.session.query(Task)
+        .filter_by(status="pending")
+        .order_by(Task.created_at.asc())
+        .with_for_update()
+        .limit(1)
+        .first()
+    )
+    if task:
+        request_transcribe(task, [url.url for url in task.url])
+
+
+@app.route("/transcribe/callback", methods=["POST"])
+def transcribe_callback():
+    if g.task.status != "running":
+        return {"error": "Task is not running"}
+    content = request.json
+    status = content["status"]
+    with db.session.begin():
+        g.task.status = status
+        g.task.updated_at = func.now()
+        g.task.kaggle_user.available = True
+    try:
+        with db.session.begin():
+            get_top_pending_task()
+    except Exception as e:
+        app.log_exception(e)
+    return {"task_id": g.task.uuid, "status": "status"}
 
 
 if __name__ == "__main__":

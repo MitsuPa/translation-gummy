@@ -10,5 +10,7 @@ def encode(data: dict) -> str:
     return jwt.encode(data, os.environ["JWT_SECRET"], algorithm="HS256")
 
 
-def decode(token: str) -> dict:
-    return jwt.decode(token, os.environ["JWT_SECRET"], algorithms=["HS256"])
+def decode(token: str, options: dict = {}) -> dict:
+    return jwt.decode(
+        token, os.environ["JWT_SECRET"], algorithms=["HS256"], options=options
+    )
