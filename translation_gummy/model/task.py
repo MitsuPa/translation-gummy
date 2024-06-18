@@ -27,6 +27,7 @@ class Task(db.Model):
     updated_at: Mapped[int] = mapped_column(TIMESTAMP, server_default=func.now())
 
     url: Mapped[List["Url"]] = db.relationship("Url", back_populates="task")
+    kaggle_user: Mapped["KaggleUser"] = db.relationship("KaggleUser")
 
 
 class Url(db.Model):

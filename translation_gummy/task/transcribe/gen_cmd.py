@@ -1,7 +1,7 @@
 def gen_commands(
     yt_dlp_command: list[str],
     whisper_command: str,
-    gen_count_video_files_command: str,
+    count_video_files_command: str,
 ) -> list[str]:
     """
     Generate a list of commands to be executed.
@@ -23,7 +23,7 @@ def gen_commands(
         ]
         + yt_dlp_command
         + [
-            gen_count_video_files_command,
+            count_video_files_command,
             "git clone https://huggingface.co/spaces/aadnk/whisper-webui",
             whisper_command,
             'find video -type f \( -name "*.json" -o -name "*.txt" -o -name "*.vtt" \) -exec rm {} \;',

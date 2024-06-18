@@ -40,6 +40,8 @@ def run_kaggle_kernel(
     kaggle_username: str,
     kaggle_key: str,
     max_files: int = 1,
+    callback_jwt: str = "",
+    callback_url: str = "",
 ) -> None:
     with tempfile.TemporaryDirectory() as tmpdirname:
         kernel_metadata["id"] = f"{kaggle_username}/translation-gummy"
@@ -53,6 +55,8 @@ def run_kaggle_kernel(
                 gen_count_video_files_command(max_files),
             )
             lines[0] = f"commands: list[str] = {commands}\n"
+            lines[1] = f'callback_jwt: str = "{callback_jwt}"\n'
+            lines[2] = f'callback_url: str = "{callback_url}"\n'
         with open(os.path.join(tmpdirname, kernel_metadata["code_file"]), "w") as new_f:
             new_f.writelines(lines)
         authenticate(kaggle_username, kaggle_key)
