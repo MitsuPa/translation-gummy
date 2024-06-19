@@ -27,6 +27,7 @@ def gen_commands(
             "git clone https://huggingface.co/spaces/aadnk/whisper-webui",
             whisper_command,
             'find video -type f \( -name "*.json" -o -name "*.txt" -o -name "*.vtt" \) -exec rm {} \;',
+            'cd video && for file in *.*-subs.srt; do mv "$file" "${file%%.*}.srt"; done',
             "rm -rf whisper-webui/",
         ]
     )
