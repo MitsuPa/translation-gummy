@@ -9,3 +9,4 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(model_class=Base, engine_options={"pool_size": 1})
 
 from model.task import Task, Url, KaggleUser
+from model.onedrive import OneDrive

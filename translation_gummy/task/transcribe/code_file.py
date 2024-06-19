@@ -1,6 +1,6 @@
 commands: list[str] = []
-callback_jwt: str = ""
-callback_url: str = ""
+api_jwt: str = ""
+api_url: str = ""
 import subprocess
 import os
 import requests
@@ -22,6 +22,25 @@ def run_command(
     )
 
 
+def upload_file(upload_url, file_path):
+    jsons = []
+    with open(file_path, "rb") as f:
+        while True:
+            chunk = f.read(10 * 1024 * 1024)
+            if not chunk:
+                break
+            response = requests.put(
+                upload_url,
+                data=chunk,
+                headers={
+                    "Content-Length": str(len(chunk)),
+                    "Content-Range": f"bytes {f.tell() - len(chunk)}-{f.tell() - 1}/{os.path.getsize(file_path)}",
+                },
+            )
+            jsons.append(response.json())
+    return jsons
+
+
 status = "completed"
 try:
     for command in commands:
@@ -29,12 +48,22 @@ try:
         if result.returncode != 0:
             status = "failed"
             raise Exception(f"Command failed: {command}")
-finally:
-    if callback_url != "":
-        requests.post(
-            callback_url,
+    for file in os.listdir("video"):
+        upload_url = requests.post(
+            f"{api_url}upload",
             headers={
-                "Authorization": f"{callback_jwt}",
+                "Authorization": f"{api_jwt}",
+                "Content-Type": "application/json",
+            },
+            json={"file": file},
+        ).json()["upload_url"]
+        upload_file(upload_url, f"video/{file}")
+finally:
+    if api_url != "":
+        requests.post(
+            f"{api_url}transcribe/callback",
+            headers={
+                "Authorization": f"{api_jwt}",
                 "Content-Type": "application/json",
             },
             json={"status": status},

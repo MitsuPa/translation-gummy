@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from sqlalchemy import func
 from model import db, Task, Url, KaggleUser
 from task.transcribe.api import *
-from utils import jwt_manager
+from utils import jwt_manager, onedrive
 import uuid
 
 load_dotenv()
@@ -42,7 +42,7 @@ def transcribe():
 
 @app.before_request
 def before_request():
-    need_auth = request.path in ["/transcribe/callback"]
+    need_auth = request.path in ["/transcribe/callback", "/upload"]
     if not need_auth:
         return
     jwt = request.headers.get("Authorization")
@@ -52,10 +52,10 @@ def before_request():
         payload = jwt_manager.decode(jwt, options={"verify_exp": False})
         with db.session.begin():
             g.task = db.session.query(Task).filter_by(uuid=payload["task_id"]).first()
-        if timegm(datetime.datetime.now(tz=datetime.timezone.utc).utctimetuple()) > int(
-            payload["exp"]
-        ):
-            raise Exception("Token has expired")
+        # if timegm(datetime.datetime.now(tz=datetime.timezone.utc).utctimetuple()) > int(
+        #     payload["exp"]
+        # ):
+        #     raise Exception("Token has expired")
     except Exception as e:
         return {"error": str(e)}, 401
 
@@ -75,8 +75,8 @@ def request_transcribe(task: Task, video_url: list[str]):
             kaggle_username=kaggle_user.username,
             kaggle_key=KAGGLE_KEYS[kaggle_user.username],
             max_files=os.environ.get("MAX_FILES", 1),
-            callback_jwt=jwt_manager.encode({"task_id": task.uuid}),
-            callback_url=os.environ["API_BASE_URL"] + "transcribe/callback",
+            api_jwt=jwt_manager.encode({"task_id": task.uuid}),
+            api_url=os.environ["API_BASE_URL"],
         )
         kaggle_user.available = False
         kaggle_user.updated_at = func.now()
@@ -99,10 +99,12 @@ def get_top_pending_task():
 
 @app.route("/transcribe/callback", methods=["POST"])
 def transcribe_callback():
+    content = request.json
+    if "status" not in content:
+        return {"error": "status is missing"}
     with db.session.begin():
         if g.task.status != "running":
             return {"error": "Task is not running"}
-        content = request.json
         status = content["status"]
         g.task.status = status
         g.task.updated_at = func.now()
@@ -113,6 +115,29 @@ def transcribe_callback():
     except Exception as e:
         app.log_exception(e)
     return {"task_id": g.task.uuid, "status": g.task.status}
+
+
+@app.route("/upload", methods=["POST"])
+def upload():
+    content = request.json
+    if "file" not in content:
+        return {"error": "file is missing"}
+    with db.session.begin():
+        task_id = g.task.uuid
+    folder_path = f"{os.environ['UPLOAD_FOLDER']}/{task_id}"
+    email = os.environ["ONEDRIVE_EMAIL"]
+    folder_id = onedrive.get_item(folder_path, onedrive.get_access_token(), email).get(
+        "id", None
+    )
+    if not folder_id:
+        folder_id = onedrive.create_folder(
+            folder_path, onedrive.get_access_token(), email
+        )["id"]
+    return {
+        "upload_url": onedrive.create_upload_session(
+            folder_id, content["file"], onedrive.get_access_token, email
+        )["uploadUrl"]
+    }
 
 
 if __name__ == "__main__":
