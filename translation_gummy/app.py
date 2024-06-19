@@ -99,11 +99,11 @@ def get_top_pending_task():
 
 @app.route("/transcribe/callback", methods=["POST"])
 def transcribe_callback():
-    if g.task.status != "running":
-        return {"error": "Task is not running"}
-    content = request.json
-    status = content["status"]
     with db.session.begin():
+        if g.task.status != "running":
+            return {"error": "Task is not running"}
+        content = request.json
+        status = content["status"]
         g.task.status = status
         g.task.updated_at = func.now()
         g.task.kaggle_user.available = True
@@ -112,7 +112,7 @@ def transcribe_callback():
             get_top_pending_task()
     except Exception as e:
         app.log_exception(e)
-    return {"task_id": g.task.uuid, "status": "status"}
+    return {"task_id": g.task.uuid, "status": g.task.status}
 
 
 if __name__ == "__main__":
