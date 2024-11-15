@@ -1,0 +1,157 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "transcribe/transcribe.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "TranscribeService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/transcribe.TranscribeService/Transcribe": {
+      "post": {
+        "operationId": "TranscribeService_Transcribe",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/transcribeTask"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/transcribeTranscribeRequest"
+            }
+          }
+        ],
+        "tags": [
+          "TranscribeService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "googlerpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "transcribeTask": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/definitions/transcribeTaskStatus"
+        },
+        "inputUrl": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "inputUrl"
+      ]
+    },
+    "transcribeTaskStatus": {
+      "type": "string",
+      "enum": [
+        "PENDING",
+        "IN_PROGRESS",
+        "COMPLETED",
+        "FAILED"
+      ],
+      "default": "PENDING"
+    },
+    "transcribeTranscribeRequest": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "whisperImplementation": {
+          "$ref": "#/definitions/transcribeWhisperImplementation"
+        },
+        "whisperModel": {
+          "$ref": "#/definitions/transcribeWhisperModel"
+        },
+        "wordTimestamps": {
+          "type": "boolean",
+          "default": "true"
+        },
+        "retainInputFile": {
+          "type": "boolean",
+          "default": "false"
+        },
+        "checkDuplicate": {
+          "type": "boolean",
+          "default": "true"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "transcribeWhisperImplementation": {
+      "type": "string",
+      "enum": [
+        "FASTER_WHISPER",
+        "WHISPER"
+      ],
+      "default": "FASTER_WHISPER"
+    },
+    "transcribeWhisperModel": {
+      "type": "string",
+      "enum": [
+        "LARGE_V3",
+        "LARGE_V2",
+        "LARGE_V1",
+        "LARGE_V3_TURBO"
+      ],
+      "default": "LARGE_V3"
+    }
+  }
+}

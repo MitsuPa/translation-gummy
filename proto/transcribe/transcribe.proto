@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package transcribe;
+
+import "google/api/field_behavior.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/MitsuPa/translation-gummy/proto/transcribe";
+
+enum WhisperImplementation {
+  FASTER_WHISPER = 0;
+  WHISPER = 1;
+}
+
+enum WhisperModel {
+  LARGE_V3 = 0;
+  LARGE_V2 = 1;
+  LARGE_V1 = 2;
+  LARGE_V3_TURBO = 3;
+}   
+
+message TranscribeRequest {
+  string url = 1 [(google.api.field_behavior) = REQUIRED];
+  WhisperImplementation whisper_implementation = 2;
+  WhisperModel whisper_model = 3;
+  bool word_timestamps = 4 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+    default: "true"
+  }];
+  bool retain_input_file = 5 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+    default: "false"
+  }];
+  bool check_duplicate = 6 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+    default: "true"
+  }];
+}
+
+message Task {
+  enum Status {
+    PENDING = 0;
+    IN_PROGRESS = 1;
+    COMPLETED = 2;
+    FAILED = 3;
+  }
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  Status status = 2;
+  string input_url = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+service TranscribeService {
+  rpc Transcribe(TranscribeRequest) returns (Task) {}
+}
